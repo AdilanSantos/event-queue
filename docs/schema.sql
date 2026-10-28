@@ -8,6 +8,7 @@ CREATE TABLE events (
     processing_started_at  TIMESTAMPTZ  NULL,
     last_attempt_at        TIMESTAMPTZ  NULL,
     next_attempt_at        TIMESTAMPTZ  NULL,
+    last_error             TEXT         NULL,
     payload                JSONB        NOT NULL,
 
     CONSTRAINT chk_final_has_attempt

@@ -64,10 +64,13 @@ def mark_retry_or_failed(db: Session, event_id: str, error: str) -> None:
         db.execute(
             text("""
                 UPDATE events
-                SET status = 'failed', last_attempt_at = now(), next_attempt_at = NULL
+                SET status = 'failed',
+                    last_attempt_at = now(),
+                    next_attempt_at = NULL,
+                    last_error = :error
                 WHERE id = :id
             """),
-            {"id": event_id},
+            {"id": event_id, "error": error},
         )
     else:
         delay = RETRY_DELAYS[attempts - 1]
@@ -76,9 +79,10 @@ def mark_retry_or_failed(db: Session, event_id: str, error: str) -> None:
                 UPDATE events
                 SET status = 'pending',
                     last_attempt_at = now(),
-                    next_attempt_at = now() + :delay
+                    next_attempt_at = now() + :delay,
+                    last_error = :error
                 WHERE id = :id
             """),
-            {"id": event_id, "delay": delay},
+            {"id": event_id, "delay": delay, "error": error},
         )
     db.commit()
