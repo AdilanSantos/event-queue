@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -17,4 +17,4 @@ class EventAccepted(BaseModel):
     """Response returned after the event is durably stored."""
 
     id: str
-    status: str
+    status: Literal["accepted", "duplicate"]

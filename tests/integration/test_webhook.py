@@ -50,3 +50,10 @@ def test_invalid_date_is_rejected(client):
     body["occurred_at"] = "ontem"
     response = client.post("/webhook", json=body)
     assert response.status_code == 422
+
+def test_duplicate_returns_duplicate_status(client):
+    client.post("/webhook", json=payload())
+    response = client.post("/webhook", json=payload())
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "duplicate"
