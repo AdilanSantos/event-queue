@@ -9,6 +9,7 @@ from src.db.database import SessionLocal
 from src.services.event_service import claim_event, mark_processed, mark_retry_or_failed
 from src.services.processing_service import process_event
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
