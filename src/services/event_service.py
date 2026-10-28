@@ -34,3 +34,51 @@ def claim_event(db: Session, event_id: str) -> bool:
     claimed = result.scalar_one_or_none() is not None
     db.commit()
     return claimed
+
+
+RETRY_DELAYS = [timedelta(seconds=30), timedelta(seconds=60)]
+MAX_ATTEMPTS = 3
+
+
+def mark_processed(db: Session, event_id: str) -> None:
+    db.execute(
+        text("""
+            UPDATE events
+            SET status = 'processed', last_attempt_at = now()
+            WHERE id = :id
+        """),
+        {"id": event_id},
+    )
+    db.commit()
+
+
+def mark_retry_or_failed(db: Session, event_id: str, error: str) -> None:
+    attempts = db.execute(
+        text("SELECT attempts FROM events WHERE id = :id"), {"id": event_id}
+    ).scalar_one()
+
+    if attempts < 1:
+        raise ValueError(f"attempts inválido para {event_id}: {attempts}")
+
+    if attempts >= MAX_ATTEMPTS:
+        db.execute(
+            text("""
+                UPDATE events
+                SET status = 'failed', last_attempt_at = now(), next_attempt_at = NULL
+                WHERE id = :id
+            """),
+            {"id": event_id},
+        )
+    else:
+        delay = RETRY_DELAYS[attempts - 1]
+        db.execute(
+            text("""
+                UPDATE events
+                SET status = 'pending',
+                    last_attempt_at = now(),
+                    next_attempt_at = now() + :delay
+                WHERE id = :id
+            """),
+            {"id": event_id, "delay": delay},
+        )
+    db.commit()
