@@ -52,7 +52,8 @@ def mark_processed(db: Session, event_id: str) -> None:
     db.commit()
 
 
-def mark_retry_or_failed(db: Session, event_id: str, error: str) -> None:
+def mark_retry_or_failed(db: Session, event_id: str, error: str) -> bool:
+    """Retorna True se o evento foi para failed (esgotou as tentativas)."""
     attempts = db.execute(
         text("SELECT attempts FROM events WHERE id = :id"), {"id": event_id}
     ).scalar_one()
@@ -72,17 +73,20 @@ def mark_retry_or_failed(db: Session, event_id: str, error: str) -> None:
             """),
             {"id": event_id, "error": error},
         )
-    else:
-        delay = RETRY_DELAYS[attempts - 1]
-        db.execute(
-            text("""
-                UPDATE events
-                SET status = 'pending',
-                    last_attempt_at = now(),
-                    next_attempt_at = now() + :delay,
-                    last_error = :error
-                WHERE id = :id
-            """),
-            {"id": event_id, "delay": delay, "error": error},
-        )
+        db.commit()
+        return True
+
+    delay = RETRY_DELAYS[attempts - 1]
+    db.execute(
+        text("""
+            UPDATE events
+            SET status = 'pending',
+                last_attempt_at = now(),
+                next_attempt_at = now() + :delay,
+                last_error = :error
+            WHERE id = :id
+        """),
+        {"id": event_id, "delay": delay, "error": error},
+    )
     db.commit()
+    return False

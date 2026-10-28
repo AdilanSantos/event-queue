@@ -8,6 +8,7 @@ from sqlalchemy import text
 from src.db.database import SessionLocal
 from src.services.event_service import claim_event, mark_processed, mark_retry_or_failed
 from src.services.processing_service import process_event
+from src.services.rabbit_service import publish_dead_letter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,7 +33,15 @@ def handle_event(event_id: str) -> None:
             process_event(event_id, payload_row)
         except Exception as exc:
             logger.exception("Falha ao processar %s", event_id)
-            mark_retry_or_failed(db, event_id, str(exc))
+            became_failed = mark_retry_or_failed(db, event_id, str(exc))
+            if became_failed:
+                try:
+                    publish_dead_letter(event_id)
+                except Exception:
+                    logger.exception(
+                        "Falha ao publicar %s na DLQ; o status failed já está no banco",
+                        event_id,
+                    )
         else:
             mark_processed(db, event_id)
 
